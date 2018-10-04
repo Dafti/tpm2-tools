@@ -49,10 +49,10 @@ Handle_parent=0x81010019
 
 cleanup() {
   rm -f $file_primary_key_ctx $file_loadexternal_key_pub $file_loadexternal_key_priv \
-         $file_loadexternal_key_name $file_loadexternal_key_ctx \
-         $file_loadexternal_output private.pem public.pem plain.txt \
-         plain.rsa.dec key.ctx public.ecc.pem private.ecc.pem \
-         data.in.digest data.out.signed ticket.out name.bin stdout.yaml
+    $file_loadexternal_key_name $file_loadexternal_key_ctx \
+    $file_loadexternal_output private.pem public.pem plain.txt \
+    plain.rsa.dec key.ctx public.ecc.pem private.ecc.pem \
+    data.in.digest data.out.signed ticket.out name.bin stdout.yaml
 
   ina "$@" "keep_handle"
   if [ $? -ne 0 ]; then
@@ -73,53 +73,86 @@ cleanup "no-shut-down"
 tpm2_clear
 
 run_tss_test() {
+  printf "################################################################################\n"
+  printf "# run_tss_test START\n"
 
-	tpm2_createprimary -Q -a e -g $alg_primary_obj -G $alg_primary_key -o $file_primary_key_ctx
+  printf "> tpm2_createprimary -Q -a e -g $alg_primary_obj -G $alg_primary_key -o $file_primary_key_ctx\n"
+  tpm2_createprimary -Q -a e -g $alg_primary_obj -G $alg_primary_key -o $file_primary_key_ctx
 
-	tpm2_create -Q -g $alg_create_obj -G $alg_create_key -u $file_loadexternal_key_pub -r $file_loadexternal_key_priv  -C $file_primary_key_ctx
+  printf "> tpm2_create -Q -g $alg_create_obj -G $alg_create_key -u $file_loadexternal_key_pub -r $file_loadexternal_key_priv  -C $file_primary_key_ctx\n"
+  tpm2_create -Q -g $alg_create_obj -G $alg_create_key -u $file_loadexternal_key_pub -r $file_loadexternal_key_priv  -C $file_primary_key_ctx
 
-	tpm2_loadexternal -Q -a n   -u $file_loadexternal_key_pub   -o $file_loadexternal_key_ctx
+  printf "> tpm2_loadexternal -Q -a n   -u $file_loadexternal_key_pub   -o $file_loadexternal_key_ctx\n"
+  tpm2_loadexternal -Q -a n   -u $file_loadexternal_key_pub   -o $file_loadexternal_key_ctx
 
-	tpm2_evictcontrol -Q -a o -c $file_primary_key_ctx -p $Handle_parent
+  printf "> tpm2_evictcontrol -Q -a o -c $file_primary_key_ctx -p $Handle_parent\n"
+  tpm2_evictcontrol -Q -a o -c $file_primary_key_ctx -p $Handle_parent
 
-	# Test with Handle
-	cleanup "keep_handle" "no-shut-down"
+  # Test with Handle
+  printf "> cleanup \"keep_handle\" \"no-shut-down\"\n"
+  cleanup "keep_handle" "no-shut-down"
 
-	tpm2_create -Q -C $Handle_parent   -g $alg_create_obj  -G $alg_create_key -u $file_loadexternal_key_pub  -r  $file_loadexternal_key_priv
+  printf "> tpm2_create -Q -C $Handle_parent   -g $alg_create_obj  -G $alg_create_key -u $file_loadexternal_key_pub  -r  $file_loadexternal_key_priv\n"
+  tpm2_create -Q -C $Handle_parent   -g $alg_create_obj  -G $alg_create_key -u $file_loadexternal_key_pub  -r  $file_loadexternal_key_priv
 
-	tpm2_loadexternal -Q -a n   -u $file_loadexternal_key_pub
+  printf "> tpm2_loadexternal -Q -a n   -u $file_loadexternal_key_pub\n"
+  tpm2_loadexternal -Q -a n   -u $file_loadexternal_key_pub
 
-	# Test with default hierarchy (and handle)
-	cleanup "keep_handle" "no-shut-down"
+  # Test with default hierarchy (and handle)
+  printf "> cleanup \"keep_handle\" \"no-shut-down\"\n"
+  cleanup "keep_handle" "no-shut-down"
 
-	tpm2_create -Q -C $Handle_parent -g $alg_create_obj -G $alg_create_key -u $file_loadexternal_key_pub -r  $file_loadexternal_key_priv
+  printf "> tpm2_create -Q -C $Handle_parent -g $alg_create_obj -G $alg_create_key -u $file_loadexternal_key_pub -r  $file_loadexternal_key_priv\n"
+  tpm2_create -Q -C $Handle_parent -g $alg_create_obj -G $alg_create_key -u $file_loadexternal_key_pub -r  $file_loadexternal_key_priv
 
-	tpm2_loadexternal -Q -u $file_loadexternal_key_pub
+  printf "> tpm2_loadexternal -Q -u $file_loadexternal_key_pub\n"
+  tpm2_loadexternal -Q -u $file_loadexternal_key_pub
+
+  printf "# run_tss_test END\n"
+  printf "################################################################################\n"
 }
 
 # Test loading an OSSL generated private key with a password
 run_rsa_test() {
+  printf "################################################################################\n"
+  printf "# run_rsa_test START\n"
 
-    openssl genrsa -out private.pem $1
-    openssl rsa -in private.pem -out public.pem -outform PEM -pubout
+  printf "> openssl genrsa -out private.pem $1\n"
+  openssl genrsa -out private.pem $1
+  printf "> openssl rsa -in private.pem -out public.pem -outform PEM -pubout\n"
+  openssl rsa -in private.pem -out public.pem -outform PEM -pubout
 
-    echo "hello world" > plain.txt
-    openssl rsautl -encrypt -inkey public.pem -pubin -in plain.txt -out plain.rsa.enc
+  printf "> echo \"hello world\" > plain.txt\n"
+  echo "hello world" > plain.txt
+  printf "> openssl rsautl -encrypt -inkey public.pem -pubin -in plain.txt -out plain.rsa.enc\n"
+  openssl rsautl -encrypt -inkey public.pem -pubin -in plain.txt -out plain.rsa.enc
 
-    tpm2_loadexternal -G rsa -a n -p foo -r private.pem -o key.ctx
+  printf "> tpm2_loadexternal -G rsa -a n -p foo -r private.pem -o key.ctx\n"
+  tpm2_loadexternal -G rsa -a n -p foo -r private.pem -o key.ctx
 
-    tpm2_rsadecrypt -c key.ctx -p foo -I plain.rsa.enc -o plain.rsa.dec
+  printf "> tpm2_rsadecrypt -c key.ctx -p foo -I plain.rsa.enc -o plain.rsa.dec\n"
+  tpm2_rsadecrypt -c key.ctx -p foo -I plain.rsa.enc -o plain.rsa.dec
 
-    diff plain.txt plain.rsa.dec
+  printf "> diff plain.txt plain.rsa.dec\n"
+  diff plain.txt plain.rsa.dec
 
-    # try encrypting with the public key and decrypting with the private
-    tpm2_loadexternal -G rsa -a n -p foo -u public.pem -o key.ctx
+  # try encrypting with the public key and decrypting with the private
+  printf "> tpm2_loadexternal -G rsa -a n -p foo -u public.pem -o key.ctx\n"
+  tpm2_loadexternal -G rsa -a n -p foo -u public.pem -o key.ctx
 
-    tpm2_rsaencrypt -Tmssim -c key.ctx plain.txt -o plain.rsa.enc
+  # printf "> tpm2_rsaencrypt -Tmssim -c key.ctx plain.txt -o plain.rsa.enc\n"
+  # tpm2_rsaencrypt -Tmssim -c key.ctx plain.txt -o plain.rsa.enc
+  printf "> tpm2_rsaencrypt -T${TPM2TOOLS_TCTI} -c key.ctx plain.txt -o plain.rsa.enc\n"
+  tpm2_rsaencrypt -T${TPM2TOOLS_TCTI} -c key.ctx plain.txt -o plain.rsa.enc
 
-    openssl rsautl -decrypt -inkey private.pem -in plain.rsa.enc -out plain.rsa.dec
+  printf "> openssl rsautl -decrypt -inkey private.pem -in plain.rsa.enc -out plain.rsa.dec\n"
+  openssl rsautl -decrypt -inkey private.pem -in plain.rsa.enc -out plain.rsa.dec
 
-    diff plain.txt plain.rsa.dec
+  printf "> diff plain.txt plain.rsa.dec\n"
+  diff plain.txt plain.rsa.dec
+
+  printf "# run_rsa_test END\n"
+  printf "################################################################################\n"
 }
 
 #
@@ -130,53 +163,96 @@ run_rsa_test() {
 # Notes: Also tests that name output and YAML output are valid.
 #
 run_aes_test() {
+  printf "################################################################################\n"
+  printf "# run_aes_test START\n"
 
-    dd if=/dev/urandom of=sym.key bs=1 count=$(($1 / 8)) 2>/dev/null
+  printf "> dd if=/dev/urandom of=sym.key bs=1 count=$(($1 / 8)) 2>/dev/null\n"
+  dd if=/dev/urandom of=sym.key bs=1 count=$(($1 / 8)) 2>/dev/null
 
-    tpm2_loadexternal -G aes -r sym.key -n name.bin -o key.ctx > stdout.yaml
+  printf "> tpm2_loadexternal -G aes -r sym.key -n name.bin -o key.ctx > stdout.yaml\n"
+  tpm2_loadexternal -G aes -r sym.key -n name.bin -o key.ctx > stdout.yaml
 
-	local name1=`yaml_get_kv "stdout.yaml" "name"`
-	local name2=`xxd -c 256 -p name.bin`
+  printf "> local name1=\`yaml_get_kv \"stdout.yaml\" \"'name'\"\`"
+  local name1=`yaml_get_kv "stdout.yaml" "'name'"`
+  printf " == $name1\n"
+  printf "> local xname1=\`python -c \"printf('{:X}'.format($name1))\"\`"
+  local xname1=`python -c "print '{:X}'.format($name1)"`
+  printf " == $xname1\n"
+  printf "> local xname2=`xxd -u -c 256 -p name.bin`\n"
+  local xname2=`xxd -u -c 256 -p name.bin`
+  printf "> local name2=\`python -c \"print int(\"$xname2\",16)\"\`"
+  local name2=`python -c "print int(\"$xname2\",16)"`
+  printf " == $name2\n"
 
-	test "$name1" == "$name2"
+  printf "> test \"$name1\" == \"$name2\""
+  test "$name1" = "$name2"
+  if [ "$?" = "0" ]; then
+    printf " (equal)\n"
+  else
+    printf " different)\n"
+  fi
 
-    echo "plaintext" > "plain.txt"
+  printf "> echo \"plaintext\" > \"plain.txt\"\n"
+  echo "plaintext" > "plain.txt"
 
-    tpm2_encryptdecrypt -c key.ctx -I plain.txt -o plain.enc
+  cat plain.txt
 
-    openssl enc -in plain.enc -out plain.dec.ssl -d -K `xxd -p sym.key` -iv 0 \
-        -aes-$1-cfb
+  printf "> tpm2_encryptdecrypt -c key.ctx -I plain.txt -o plain.enc\n"
+  tpm2_encryptdecrypt -c key.ctx -I plain.txt -o plain.enc
 
-    diff plain.txt plain.dec.ssl
+  printf "> openssl enc -in plain.enc -out plain.dec.ssl -d -K `xxd -p -c 256 sym.key` -iv 0 -aes-$1-cfb\n"
+  openssl enc -in plain.enc -out plain.dec.ssl -d -K `xxd -p -c 256 sym.key` -iv 0 -aes-$1-cfb
+
+  printf "> diff plain.txt plain.dec.ssl\n"
+  diff plain.txt plain.dec.ssl
+
+  printf "# run_aes_test END\n"
+  printf "################################################################################\n"
 }
 
 run_ecc_test() {
-	#
-	# Test loading an OSSL PEM format ECC key, and verifying a signature external
-	# to the TPM
-	#
+  printf "################################################################################\n"
+  printf "# run_ecc_test START\n"
 
-	#
-	# Generate a NIST P256 Private and Public ECC pem file
-	#
-	openssl ecparam -name $1 -genkey -noout -out private.ecc.pem
-	openssl ec -in private.ecc.pem -out public.ecc.pem -pubout
+  #
+  # Test loading an OSSL PEM format ECC key, and verifying a signature external
+  # to the TPM
+  #
 
-	# Generate a hash to sign
-	echo "data to sign" > data.in.raw
-	sha256sum data.in.raw | awk '{ print "000000 " $1 }' | xxd -r -c 32 > data.in.digest
+  #
+  # Generate a NIST P256 Private and Public ECC pem file
+  #
+  printf "> openssl ecparam -name $1 -genkey -noout -out private.ecc.pem\n"
+  openssl ecparam -name $1 -genkey -noout -out private.ecc.pem
+  printf "> openssl ec -in private.ecc.pem -out public.ecc.pem -pubout\n"
+  openssl ec -in private.ecc.pem -out public.ecc.pem -pubout
 
-	# Load the private key for signing
-    tpm2_loadexternal -Q -G ecc -r private.ecc.pem -o key.ctx
+  # Generate a hash to sign
+  printf "> echo "data to sign" > data.in.raw\n"
+  echo "data to sign" > data.in.raw
+  printf "> sha256sum data.in.raw | awk '{ print \"000000 \" $1 }' | xxd -r -c 32 > data.in.digest\n"
+  sha256sum data.in.raw | awk '{ print "000000 " $1 }' | xxd -r -c 32 > data.in.digest
 
-	# Sign in the TPM and verify with OSSL
-	tpm2_sign -Q -c key.ctx -G sha256 -D data.in.digest -f plain -s data.out.signed
-	openssl dgst -verify public.ecc.pem -keyform pem -sha256 -signature data.out.signed data.in.raw
+  # Load the private key for signing
+  printf "> tpm2_loadexternal -Q -G ecc -r private.ecc.pem -o key.ctx\n"
+  tpm2_loadexternal -Q -G ecc -r private.ecc.pem -o key.ctx
 
-	# Sign with openssl and verify with TPM but only with the public portion of an object loaded
-	tpm2_loadexternal -Q -G ecc -u public.ecc.pem -o key.ctx
-	openssl dgst -sha256 -sign private.ecc.pem -out data.out.signed data.in.raw
-	tpm2_verifysignature -Q -c key.ctx -G sha256 -m data.in.raw -f ecdsa -s data.out.signed
+  # Sign in the TPM and verify with OSSL
+  printf "> tpm2_sign -Q -c key.ctx -G sha256 -D data.in.digest -f plain -s data.out.signed\n"
+  tpm2_sign -Q -c key.ctx -G sha256 -D data.in.digest -f plain -s data.out.signed
+  printf "> openssl dgst -verify public.ecc.pem -keyform pem -sha256 -signature data.out.signed data.in.raw\n"
+  openssl dgst -verify public.ecc.pem -keyform pem -sha256 -signature data.out.signed data.in.raw
+
+  # Sign with openssl and verify with TPM but only with the public portion of an object loaded
+  printf "> tpm2_loadexternal -Q -G ecc -u public.ecc.pem -o key.ctx\n"
+  tpm2_loadexternal -Q -G ecc -u public.ecc.pem -o key.ctx
+  printf "> openssl dgst -sha256 -sign private.ecc.pem -out data.out.signed data.in.raw\n"
+  openssl dgst -sha256 -sign private.ecc.pem -out data.out.signed data.in.raw
+  printf "> tpm2_verifysignature -Q -c key.ctx -G sha256 -m data.in.raw -f ecdsa -s data.out.signed\n"
+  tpm2_verifysignature -Q -c key.ctx -G sha256 -m data.in.raw -f ecdsa -s data.out.signed
+
+  printf "# run_ecc_test END\n"
+  printf "################################################################################\n"
 }
 
 run_tss_test

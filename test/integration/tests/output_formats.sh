@@ -63,63 +63,75 @@ file_quote_msg=quote.msg
 file_quote_sig_base=quote.sig
 
 cleanup() {
-    rm -f "$file_pubek_base".*
-    rm -f "$file_pubak_tss" "$file_pubak_name" "$file_pubak_pem"
-    rm -f "$file_hash_ticket" "$file_hash_result" "$file_sig_base".*
-    rm -f "$file_quote_msg" "$file_quote_sig_base".* $file_hash_input
+  rm -f "$file_pubek_base".*
+  rm -f "$file_pubak_tss" "$file_pubak_name" "$file_pubak_pem"
+  rm -f "$file_hash_ticket" "$file_hash_result" "$file_sig_base".*
+  rm -f "$file_quote_msg" "$file_quote_sig_base".* $file_hash_input
 
-    # Evict persistent handles, we want them to always succeed and never trip
-    # the onerror trap.
-    for handle in $handle_ek $handle_ak; do
-        tpm2_evictcontrol -Q -a o -c $handle 2>/dev/null || true
-    done
+  # Evict persistent handles, we want them to always succeed and never trip
+  # the onerror trap.
+  for handle in $handle_ek $handle_ak; do
+    tpm2_evictcontrol -Q -a o -c $handle 2>/dev/null || true
+  done
 
-    shut_down
+  shut_down
 }
 trap cleanup EXIT
 
 start_up
 
-head -c 4096 /dev/random > $file_hash_input
+printf "> head -c 4096 < /dev/urandom > $file_hash_input\n"
+head -c 4096 < /dev/urandom > $file_hash_input
 
-tpm2_createek -Q -G $alg_ek -p "$file_pubek_orig" -c $handle_ek
+printf "> tpm2_createek -Q -G $alg_ek -p $file_pubek_orig -c $handle_ek\n"
+tpm2_createek -Q -G $alg_ek -p $file_pubek_orig -c $handle_ek
 
 for fmt in tss pem der; do
 
-    this_key="${file_pubek_base}.${fmt}"
+  this_key="${file_pubek_base}.${fmt}"
 
-    tpm2_readpublic -Q -c $handle_ek -f "$fmt" -o "$this_key"
+  printf "> tpm2_readpublic -Q -c $handle_ek -f $fmt -o \"$this_key\"\n"
+  tpm2_readpublic -Q -c $handle_ek -f $fmt -o "$this_key"
 
-    if [ "$fmt" = tss ]; then
-        diff "$file_pubek_orig" "$this_key" > /dev/null
-    else
-        openssl rsa -pubin -inform "$fmt" -text -in "$this_key" &> /dev/null
-    fi
+  if [ "$fmt" = tss ]; then
+    printf "> diff \"$file_pubek_orig\" \"$this_key\" > /dev/null\n"
+    diff "$file_pubek_orig" "$this_key" > /dev/null
+  else
+    printf "> openssl rsa -pubin -inform $fmt -text -in \"$this_key\" &> /dev/null\n"
+    openssl rsa -pubin -inform $fmt -text -in "$this_key" &> /dev/null
+  fi
 
 done
 
-tpm2_createak -Q -G $alg_ak -C $handle_ek -k $handle_ak -p "$file_pubak_tss" -n "$file_pubak_name"
+printf "> tpm2_createak -Q -G $alg_ak -C $handle_ek -k $handle_ak -p $file_pubak_tss -n $file_pubak_name\n"
+tpm2_createak -Q -G $alg_ak -C $handle_ek -k $handle_ak -p $file_pubak_tss -n $file_pubak_name
 
-tpm2_readpublic -Q -c $handle_ak -f "pem" -o "$file_pubak_pem"
+printf "> tpm2_readpublic -Q -c $handle_ak -f pem -o \"$file_pubak_pem\"\n"
+tpm2_readpublic -Q -c $handle_ak -f pem -o "$file_pubak_pem"
 
+printf "> tpm2_hash -Q -a e -G $alg_hash -t \"$file_hash_ticket\" -o \"$file_hash_result\" \"$file_hash_input\"\n"
 tpm2_hash -Q -a e -G $alg_hash -t "$file_hash_ticket" -o "$file_hash_result" "$file_hash_input"
 
 for fmt in tss plain; do
-    this_sig="${file_sig_base}.${fmt}"
-    tpm2_sign -Q -c $handle_ak -G $alg_hash -m "${file_hash_input}" -f $fmt -s "${this_sig}" -t "${file_hash_ticket}"
+  this_sig="${file_sig_base}.${fmt}"
+  printf "> tpm2_sign -Q -c $handle_ak -G $alg_hash -m \"${file_hash_input}\" -f $fmt -s \"${this_sig}\" -t \"${file_hash_ticket}\"\n"
+  tpm2_sign -Q -c $handle_ak -G $alg_hash -m "${file_hash_input}" -f $fmt -s "${this_sig}" -t "${file_hash_ticket}"
 
-    if [ "$fmt" = plain ]; then
-        openssl dgst -verify "$file_pubak_pem" -keyform pem -${alg_hash} -signature "$this_sig" "$file_hash_input" > /dev/null
-    fi
+  if [ "$fmt" = plain ]; then
+    printf "> openssl dgst -verify \"$file_pubak_pem\" -keyform pem -${alg_hash} -signature \"$this_sig\" \"$file_hash_input\" > /dev/null\n"
+    openssl dgst -verify "$file_pubak_pem" -keyform pem -${alg_hash} -signature "$this_sig" "$file_hash_input" > /dev/null
+  fi
 done
 
 for fmt in tss plain; do
-    this_sig="${file_quote_sig_base}.${fmt}"
-    tpm2_quote -Q -C $handle_ak -l 0 -L "$alg_hash":0 -f $fmt -m "$file_quote_msg" -s "$this_sig"
+  this_sig="${file_quote_sig_base}.${fmt}"
+  printf "> tpm2_quote -Q -C $handle_ak -l 0 -L $alg_hash:0 -f $fmt -m \"$file_quote_msg\" -s \"$this_sig\"\n"
+  tpm2_quote -Q -C $handle_ak -l 0 -L $alg_hash:0 -f $fmt -m "$file_quote_msg" -s "$this_sig"
 
-    if [ "$fmt" = plain ]; then
-        openssl dgst -verify "$file_pubak_pem" -keyform pem -${alg_hash} -signature "$this_sig" "$file_quote_msg" > /dev/null
-    fi
+  if [ "$fmt" = plain ]; then
+    printf "> openssl dgst -verify \"$file_pubak_pem\" -keyform pem -${alg_hash} -signature \"$this_sig\" \"$file_quote_msg\" > /dev/null\n"
+    openssl dgst -verify "$file_pubak_pem" -keyform pem -${alg_hash} -signature "$this_sig" "$file_quote_msg" > /dev/null
+  fi
 done
 
 exit 0
