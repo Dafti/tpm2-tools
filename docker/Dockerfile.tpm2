@@ -1,0 +1,58 @@
+## BEGIN OF SHARED REGION #############
+FROM dafti/tpm2-base
+
+ENV PATH=/tpm2/src:/usr/local/sbin:$PATH
+
+# IBM's Software TPM 2.0
+RUN useradd --system --user-group -ms /bin/bash tss
+
+USER tss
+WORKDIR /home/tss
+
+ADD resources resources
+RUN mkdir ibmtpm && cd ibmtpm &&\
+    tar xf ../resources/ibmtpm1332.tar.gz &&\
+    make -j4 -C src
+
+ENV PATH=/home/tss/ibmtpm/src:/usr/local/bin:$PATH
+RUN tar xf resources/tpm2-tss.tar.gz && mv tpm2-tss-master tpm2-tss &&\
+    cd tpm2-tss &&\
+    ./bootstrap &&\
+    ./configure --enable-unit &&\
+    make -j4 &&\
+    make -j2 check
+
+USER root
+RUN cd /home/tss/tpm2-tss && make install && ldconfig
+
+USER tss
+WORKDIR /home/tss
+
+RUN tar xf resources/tpm2-abrmd.tar.gz && mv tpm2-abrmd-master tpm2-abrmd &&\
+    cd tpm2-abrmd &&\
+    ./bootstrap &&\
+    ./configure --with-dbuspolicydir=/etc/dbus-1/system.d \
+                --with-sys$emdsystemunitdir=/lib/systemd/system \
+                --with-systemdpresetdir=/lib/systemd/system-preset \
+                --with-udevrulesdir=/etc/udev/rules.d \
+                --datarootdir=/usr/share --enable-unit \
+                --enable-integration &&\
+    make -j4
+
+USER root
+RUN cd /home/tss/tpm2-abrmd && make install && ldconfig
+
+RUN groupadd -g 1000 tpm2 && useradd -g tpm2 -u 1000 -ms /bin/bash tpm2
+USER tpm2
+RUN mkdir -p /home/tpm2/Developer/git/tpm2-tools
+WORKDIR /home/tpm2/Developer/git/tpm2-tools
+
+# RUN git clone https://github.com/intel/tpm2-tools.git &&\
+#     cd tpm2-tools &&\
+#     ./bootstrap &&\
+#     ./configure --enable-unit &&\
+#     make -j4
+# 
+# ADD bootstrap.sh /bootstrap.sh
+# RUN chmod +x /bootstrap.sh
+# ENTRYPOINT ["/bootstrap.sh"]

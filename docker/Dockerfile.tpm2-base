@@ -1,0 +1,43 @@
+## BEGIN OF SHARED REGION #############
+FROM debian:stretch-slim
+
+ARG https_proxy
+ARG http_proxy
+
+# NOTE: This is a common layer shared with some Dockerfile's
+RUN apt-get update &&\
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        libssl-dev \
+        curl \
+        make \
+        gcc \
+        vim
+
+
+# Packages required by Intel projects
+RUN apt-get install -y --no-install-recommends \
+        libcurl4-openssl-dev \
+        autoconf-archive \
+        libglib2.0-dev \
+        libdbus-1-dev \
+        libgcrypt20-dev \
+        libcmocka0 \
+        libcmocka-dev \
+        liburiparser-dev \
+        pkg-config \
+        python-yaml \
+        pandoc \
+        autoconf \
+        automake \
+        libtool \
+        m4 \
+        net-tools \
+        man \
+        bc \
+        git
+
+# FIXME: For some misterious reason, dbus can't be installed in that previous
+# "apt-get install" up there. If we try to do so, tpm2-tools build breaks.
+RUN apt-get install -y --no-install-recommends dbus dbus-x11
