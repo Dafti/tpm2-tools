@@ -95,7 +95,8 @@ bin_PROGRAMS = \
     tools/tpm2_startauthsession \
     tools/tpm2_startup \
     tools/tpm2_unseal \
-    tools/tpm2_verifysignature
+    tools/tpm2_verifysignature \
+    tools/tpm2_test
 
 noinst_LIBRARIES = $(LIB_COMMON)
 lib_libcommon_a_SOURCES = $(LIB_SRC)
@@ -151,6 +152,7 @@ tools_tpm2_flushcontext_SOURCES = tools/tpm2_flushcontext.c $(TOOL_SRC)
 tools_tpm2_startauthsession_SOURCES = tools/tpm2_startauthsession.c $(TOOL_SRC)
 tools_tpm2_policypcr_SOURCES = tools/tpm2_policypcr.c $(TOOL_SRC)
 tools_tpm2_policyrestart_SOURCES = tools/tpm2_policyrestart.c $(TOOL_SRC)
+tools_tpm2_test_SOURCES = tools/tpm2_test.c $(TOOL_SRC)
 
 if UNIT
 TESTS = $(check_PROGRAMS)
