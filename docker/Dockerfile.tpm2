@@ -15,7 +15,7 @@ RUN mkdir ibmtpm && cd ibmtpm &&\
     make -j4 -C src
 
 ENV PATH=/home/tss/ibmtpm/src:/usr/local/bin:$PATH
-RUN tar xf resources/tpm2-tss.tar.gz && mv tpm2-tss-master tpm2-tss &&\
+RUN unzip resources/tpm2-tss.zip && mv tpm2-tss-master tpm2-tss &&\
     cd tpm2-tss &&\
     ./bootstrap &&\
     ./configure --enable-unit &&\
@@ -28,7 +28,7 @@ RUN cd /home/tss/tpm2-tss && make install && ldconfig
 USER tss
 WORKDIR /home/tss
 
-RUN tar xf resources/tpm2-abrmd.tar.gz && mv tpm2-abrmd-master tpm2-abrmd &&\
+RUN unzip resources/tpm2-abrmd.zip && mv tpm2-abrmd-master tpm2-abrmd &&\
     cd tpm2-abrmd &&\
     ./bootstrap &&\
     ./configure --with-dbuspolicydir=/etc/dbus-1/system.d \
