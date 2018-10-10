@@ -61,14 +61,18 @@ with open("$1") as f:
 pyscript
 }
 
-tpm2_getcap -l > $out
+tpm2_getcap -l | tee $out
 
 caplist=$(yaml_to_list $out)
 
 for c in $caplist; do
+    printf "======================================\n"
+    printf "tpm2_getcap --capability=\"$c\"\n"
     tpm2_getcap --capability="$c" > $out
+    cat $out
     yaml_verify $out
 done;
+printf "======================================\n"
 
 # negative tests
 trap - ERR
