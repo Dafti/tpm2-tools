@@ -474,6 +474,56 @@ static bool load_public_AES_from_file(FILE *f, const char *path, TPM2B_PUBLIC *p
     return tpm2_util_calc_unique(name_alg, key, seed, unique);
 }
 
+static bool load_public_HMAC_from_file(FILE *f, const char *path, TPM2B_PUBLIC *pub, TPM2B_SENSITIVE *priv) {
+
+    /*
+     * Get the file size and validate that it is the proper AES keysize.
+     */
+    unsigned long file_size = 0;
+    bool result = files_get_file_size(f, &file_size, path);
+    if (!result) {
+        return false;
+    }
+
+    result = tpm2_alg_util_is_hmac_size_valid(file_size);
+    if (!result) {
+        return false;
+    }
+
+    pub->publicArea.type = TPM2_ALG_KEYEDHASH;
+    TPMT_KEYEDHASH_SCHEME *s = &pub->publicArea.parameters.keyedHashDetail.scheme;
+    s->scheme = TPM2_ALG_HMAC;
+    TPMI_ALG_HASH hashAlg;
+    switch(file_size) {
+      case 32:
+        hashAlg = TPM2_ALG_SHA256;
+        break;
+      case 48:
+        hashAlg = TPM2_ALG_SHA384;
+        break;
+      case 64:
+        hashAlg = TPM2_ALG_SHA512;
+        break;
+      default:
+        LOG_ERR("HMAC keys should be 32, 48 or 64 bytes long (%lu provided)", file_size);
+        return false;
+    }
+    s->details.hmac.hashAlg = hashAlg;
+
+    /*
+     * Calculate the unique field with is the
+     * is HMAC(sensitive->seedValue, sensitive->sensitive(key itself))
+     * Where:
+     *   - HMAC Key is the seed
+     *   - Hash algorithm is the name algorithm
+     */
+    TPM2B_DIGEST *unique = &pub->publicArea.unique.sym;
+    TPM2B_DIGEST *seed = &priv->sensitiveArea.seedValue;
+    TPM2B_PRIVATE_VENDOR_SPECIFIC *key = &priv->sensitiveArea.sensitive.any;
+    TPMI_ALG_HASH name_alg = pub->publicArea.nameAlg;
+
+    return tpm2_util_calc_unique(name_alg, key, seed, unique);
+}
 
 static bool load_private_RSA_from_key(RSA *k, TPM2B_SENSITIVE *priv) {
 
@@ -663,6 +713,40 @@ static tpm2_openssl_load_rc load_private_AES_from_file(FILE *f, const char *path
     return lprc_private | lprc_public;
 }
 
+static tpm2_openssl_load_rc load_private_HMAC_from_file(FILE *f, const char *path,
+        TPM2B_PUBLIC *pub, TPM2B_SENSITIVE *priv) {
+
+    unsigned long file_size = 0;
+    bool result = files_get_file_size(f, &file_size, path);
+    if (!result) {
+        return lprc_error;
+    }
+
+    result = tpm2_alg_util_is_hmac_size_valid(file_size);
+    if (!result) {
+        return lprc_error;
+    }
+
+    priv->sensitiveArea.sensitiveType = TPM2_ALG_KEYEDHASH;
+
+    TPM2B_SYM_KEY *s = &priv->sensitiveArea.sensitive.sym;
+    s->size = file_size;
+
+    result = files_read_bytes(f, s->buffer, s->size);
+    if (!result) {
+        return lprc_error;
+    }
+
+    result = load_public_HMAC_from_file(f, path, pub, priv);
+    if (!result) {
+        return lprc_error;
+    }
+
+    LOG_WARN("Finished load_private_HMAC_from_file");
+
+    return lprc_private | lprc_public;
+}
+
 /**
  * Loads a private portion of a key, and possibly the public portion, as for RSA the public data is in
  * a private pem file.
@@ -704,6 +788,9 @@ tpm2_openssl_load_rc tpm2_openssl_load_private(const char *path, TPMI_ALG_PUBLIC
         break;
     case TPM2_ALG_ECC:
         rc =load_private_ECC_from_pem(f, path, pub, priv);
+        break;
+    case TPM2_ALG_HMAC:
+        rc = load_private_HMAC_from_file(f, path, pub, priv);
         break;
     default:
         LOG_ERR("Cannot handle algorithm, got: %s", tpm2_alg_util_algtostr(alg,
