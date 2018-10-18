@@ -524,6 +524,7 @@ static bool do_import(TSS2_SYS_CONTEXT *sapi_context,
 
     TSS2L_SYS_AUTH_RESPONSE npsessionsDataOut;
 
+    LOG_WARN("Launching Tss2_Sys_Import");
     TSS2_RC rval = TSS2_RETRY_EXP(Tss2_Sys_Import(sapi_context, phandle,
             &npsessionsData, enc_sensitive_key, public,
             private, encrypted_seed, sym_alg,
@@ -622,7 +623,8 @@ static bool on_option(char key, char *value) {
     case 'G':
         ctx.key_type = tpm2_alg_util_from_optarg(value,
                 tpm2_alg_util_flags_asymmetric
-                |tpm2_alg_util_flags_symmetric);
+                |tpm2_alg_util_flags_symmetric
+                |tpm2_alg_util_flags_keyedhash);
         if (ctx.key_type == TPM2_ALG_ERROR) {
             LOG_ERR("Unsupported key type");
             return false;
@@ -752,13 +754,16 @@ int tpm2_tool_onrun(TSS2_SYS_CONTEXT *sapi_context, tpm2_option_flags flags) {
     }
 
     TPM2B_SENSITIVE private = TPM2B_EMPTY_INIT;
-    TPM2B_PUBLIC public = {
-        .size = 0,
-        .publicArea = {
-            .nameAlg = TPM2_ALG_SHA256,
-            .objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_DECRYPT | TPMA_OBJECT_SIGN_ENCRYPT
-        },
-    };
+    TPM2B_PUBLIC public = TPM2B_EMPTY_INIT;
+    public.size = 0;
+    public.publicArea.nameAlg = TPM2_ALG_SHA256;
+    LOG_WARN("ctx.key_type = %x", ctx.key_type);
+    LOG_WARN("TPM2_ALG_HMAC = %x", TPM2_ALG_HMAC);
+    if (ctx.key_type == TPM2_ALG_HMAC) {
+      public.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_SIGN_ENCRYPT;
+    } else {
+      public.publicArea.objectAttributes = TPMA_OBJECT_USERWITHAUTH | TPMA_OBJECT_DECRYPT | TPMA_OBJECT_SIGN_ENCRYPT;
+    }
 
     if (ctx.name_alg) {
         TPMI_ALG_HASH alg = tpm2_alg_util_from_optarg(ctx.name_alg,
