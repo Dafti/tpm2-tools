@@ -50,7 +50,48 @@ trap cleanup EXIT
 
 start_up
 
+run_hmac_import_test() {
+  local file_hmac_key=hmac_$2_key.dat
+  local file_hmac_key_ctx=hmac_$2_key_ctx.dat
+  local file_hmac_key_name=hmac_$2_key_name.dat
+  local file_hmac_out=hmac_$2_out.dat
+  local file_hmac_stdout=hmac_$2_stdout.dat
+  local file_o_hmac_out=o_hmac_$2_out.dat
+  printf "################################################################\n"
+  printf "# HMAC $2 import test\n"
+
+  printf "> dd if=/dev/urandom of=$file_hmac_key bs=1 count=$(($2/8)) 2>/dev/null\n"
+  dd if=/dev/urandom of=$file_hmac_key bs=1 count=$(($2/8)) 2>/dev/null
+  local file_hmac_key_size=`stat -c "%s" $file_hmac_key`
+  local hmac_key=`xxd -g 0 -ps -c $file_hmac_key_size $file_hmac_key`
+  printf "> hmac.key = $hmac_key\n"
+  printf "> dd if=/dev/urandom of=random.in bs=1 count=4096 2>/dev/null\n"
+  dd if=/dev/urandom of=random.in bs=1 count=4096 2>/dev/null
+
+  printf "> tpm2_import -G hmac -g $name_alg -k $file_hmac_key -C $1 -u import_key.pub -r import_key.priv\n"
+  tpm2_import -G hmac -g $name_alg -k $file_hmac_key -C $1 -u import_key.pub -r import_key.priv
+  printf "> tpm2_load -C $1 -u import_key.pub -r import_key.priv -n $file_hmac_key_name -o $file_hmac_key_ctx\n"
+  tpm2_load -C $1 -u import_key.pub -r import_key.priv -n $file_hmac_key_name -o $file_hmac_key_ctx
+  printf "> tpm2_hmac -C $file_hmac_key_ctx -o $file_hmac_out random.in | tee $file_hmac_stdout\n"
+  tpm2_hmac -C $file_hmac_key_ctx -o $file_hmac_out random.in | tee $file_hmac_stdout
+
+  printf "> openssl dgst -sha256 -mac HMAC -macopt hexkey:$hmac_key -binary -out $file_o_hmac_out random.in\n"
+  openssl dgst -sha$2 -mac HMAC -macopt hexkey:$hmac_key -binary -out $file_o_hmac_out random.in
+
+  printf "> diff $file_hmac_out $file_o_hmac_out\n"
+  diff $file_hmac_out $file_o_hmac_out > /dev/null && printf "Equal\n" || printf "Different\n"
+  local file_hmac_out_size=`stat -c "%s" $file_hmac_out`
+  local file_o_hmac_out_size=`stat -c "%s" $file_o_hmac_out`
+  printf "tpm     = `xxd -g 0 -ps -c $file_hmac_out_size $file_hmac_out`\n"
+  printf "openssl = `xxd -g 0 -ps -c $file_o_hmac_out_size $file_o_hmac_out`\n"
+
+  printf "# HMAC import test done\n"
+  printf "################################################################\n"
+}
+
 run_aes_import_test() {
+  printf "################################################################\n"
+  printf "# AES $2 import test\n"
 
   printf "> dd if=/dev/urandom of=sym.key bs=1 count=$2 2>/dev/null\n"
   dd if=/dev/urandom of=sym.key bs=1 count=$2 2>/dev/null
@@ -73,6 +114,8 @@ run_aes_import_test() {
 
   printf "> diff plain.txt plain.dec.ssl\n"
   diff plain.txt plain.dec.ssl
+  printf "# AES $2 import test done\n"
+  printf "################################################################\n"
 }
 
 run_rsa_import_test() {
@@ -172,7 +215,12 @@ run_test() {
   parent_alg=$1
   name_alg=$2
 
+  printf "> tpm2_createprimary -Q -G \"$parent_alg\" -g \"$name_alg\" -a o -o parent.ctx\n"
   tpm2_createprimary -Q -G "$parent_alg" -g "$name_alg" -a o -o parent.ctx
+
+  run_hmac_import_test parent.ctx 256
+  run_hmac_import_test parent.ctx 384
+  run_hmac_import_test parent.ctx 512
 
   # 128 bit AES is 16 bytes
   run_aes_import_test parent.ctx 16
