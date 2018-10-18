@@ -953,3 +953,17 @@ bool tpm2_alg_util_is_aes_size_valid(UINT16 size_in_bytes) {
     }
 }
 
+bool tpm2_alg_util_is_hmac_size_valid(UINT16 size_in_bytes) {
+
+    switch (size_in_bytes) {
+    case 32:
+    case 48:
+    case 64:
+        return true;
+    default:
+        LOG_ERR("Invalid HMAC key size, got %u bytes, expected 32, 48 or 64",
+                size_in_bytes);
+        return false;
+    }
+}
+

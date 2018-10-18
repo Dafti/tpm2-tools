@@ -203,4 +203,13 @@ const char *tpm2_alg_util_ecc_to_str(TPM2_ECC_CURVE curve_id);
  */
 bool tpm2_alg_util_is_aes_size_valid(UINT16 size_in_bytes);
 
+/**
+ * Determines if a size is a valid HMAC key size.
+ * @param size_in_bytes
+ *  The size of a potential HMAC key in bytes.
+ * @return
+ *  true if valid, false otherwise.
+ */
+bool tpm2_alg_util_is_hmac_size_valid(UINT16 size_in_bytes);
+
 #endif /* LIB_TPM2_ALG_UTIL_H_ */
